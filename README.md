@@ -1,4 +1,4 @@
-# Electric Billing System
+# Electric Cooperative Billing System
 
 A Java Swing desktop application that manages electricity accounts and computes monthly bills. Accounts are stored in a MySQL database, so they are still there the next time you open the program.
 
