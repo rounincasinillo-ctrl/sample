@@ -39,7 +39,7 @@ public abstract class Consumer implements Billable {
     }
 
     public void setConsumerName(String consumerName) {
-        if (consumerName == null || consumerName.strip().isEmpty()) {
+        if (consumerName == null || consumerName.isBlank()) {
             throw new IllegalArgumentException("Consumer name cannot be blank.");
         }
         String name = consumerName.strip();
@@ -66,7 +66,7 @@ public abstract class Consumer implements Billable {
     }
 
     public void setConsumerAddress(String consumerAddress) {
-        if (consumerAddress == null || consumerAddress.strip().isEmpty()) {
+        if (consumerAddress == null || consumerAddress.isBlank()) {
             throw new IllegalArgumentException("Consumer address cannot be blank.");
         }
         String address = consumerAddress.strip();
