@@ -1,0 +1,119 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.sql.SQLException;
+
+public class FacilityPanel extends JPanel {
+    private static final String[] COLUMNS = {"Facility ID", "Name", "Agency", "Rate per kWh"};
+
+    private final AccountStore store;
+    private final JTextField txtName = UIHelper.field("e.g. Municipal Hall");
+    private final JTextField txtAgency = UIHelper.field("e.g. LGU San Ildefonso");
+    private final JLabel lblCount = UIHelper.countLabel("Total Facilities: 0");
+    private final DefaultTableModel tableModel = new DefaultTableModel(COLUMNS, 0);
+    private final JTable table = UIHelper.createTable(tableModel);
+
+    public FacilityPanel(AccountStore store) {
+        super(new BorderLayout(10, 10));
+        this.store = store;
+        setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        add(buildForm(), BorderLayout.NORTH);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JButton btnAdd = new JButton("Add Facility");
+        JButton btnUpdate = new JButton("Update Selected");
+        JButton btnDelete = new JButton("Delete Selected");
+        UIHelper.stylePrimary(btnAdd);
+        UIHelper.styleAccent(btnUpdate);
+        UIHelper.styleDanger(btnDelete);
+        btnAdd.addActionListener(e -> addFacility());
+        btnUpdate.addActionListener(e -> updateSelected());
+        btnDelete.addActionListener(e -> UIHelper.deleteSelected(this, store, table));
+        add(UIHelper.buttonRow(btnAdd, btnUpdate, btnDelete), BorderLayout.SOUTH);
+
+        store.addListener(this::refresh);
+    }
+
+    private JPanel buildForm() {
+        JPanel form = new JPanel(new GridLayout(3, 2, 8, 8));
+        form.setBorder(UIHelper.titledBorder("Register New Public Facility"));
+        form.add(new JLabel("Facility Name: "));
+        form.add(txtName);
+        form.add(new JLabel("Agency: "));
+        form.add(txtAgency);
+        form.add(lblCount);
+        form.add(new JLabel(""));
+        return form;
+    }
+
+    private void addFacility() {
+        try {
+            PublicFacility newItem = new PublicFacility(txtName.getText(), txtAgency.getText());
+            DatabaseHelper.save(newItem);
+
+            store.add(newItem);
+            txtName.setText("");
+            txtAgency.setText("");
+            UIHelper.info(this, "Success", "Facility added! \nID: " + newItem.getFacilityId());
+        } catch (IllegalArgumentException ex) {
+            UIHelper.warn(this, "Validation Error", ex.getMessage());
+        } catch (SQLException ex) {
+            UIHelper.error(this, "Database Error", "Could not save: " + ex.getMessage());
+        }
+    }
+
+    private void updateSelected() {
+        Billable selected = store.getSelected(table);
+        if (selected == null) {
+            UIHelper.warn(this, "Warning", "Select a facility row from the table first.");
+            return;
+        }
+        PublicFacility f = (PublicFacility) selected;
+        String oldName = f.getFacilityName();
+        String oldAgency = f.getAgency();
+
+        JTextField fldName = new JTextField(oldName);
+        JTextField fldAgency = new JTextField(oldAgency);
+
+        boolean confirmed = UIHelper.showForm(
+                this,
+                "Update Public Facility",
+                "Facility ID: " + f.getFacilityId(),
+                new String[]{"Facility Name", "Agency"},
+                new JComponent[]{fldName, fldAgency},
+                "Save Changes"
+        );
+        if (!confirmed) return;
+
+        try {
+            AccountStore.applyEdit(f, fldName.getText(), fldAgency.getText());
+            DatabaseHelper.updateDetail(f);
+            store.fireChanged();
+            UIHelper.info(this, "Updated", "Facility updated!");
+        } catch (IllegalArgumentException ex) {
+            AccountStore.applyEdit(f, oldName, oldAgency);
+            UIHelper.warn(this, "Validation Error", ex.getMessage());
+        } catch (SQLException ex) {
+            AccountStore.applyEdit(f, oldName, oldAgency);
+            UIHelper.error(this, "Database Error", "Could not update: " + ex.getMessage());
+        }
+    }
+
+    private void refresh() {
+        tableModel.setRowCount(0);
+        int count = 0;
+        for (Billable b : store.getAccounts()) {
+            if (b instanceof PublicFacility) {
+                tableModel.addRow(new Object[]{
+                        AccountStore.idOf(b),
+                        AccountStore.nameOf(b),
+                        AccountStore.detailOf(b),
+                        "PHP " + b.getRatePerKwh()
+                });
+                count++;
+            }
+        }
+        lblCount.setText("Total Facilities: " + count);
+    }
+}
