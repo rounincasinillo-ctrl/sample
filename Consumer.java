@@ -28,10 +28,10 @@ public abstract class Consumer implements Billable {
     }
 
     public void setConsumerId(String consumerId) {
-        if (consumerId == null || !consumerId.trim().matches("C-\\d{4,}")) {
+        if (consumerId == null || !consumerId.strip().matches("C-\\d{4,}")) {
             throw new IllegalArgumentException("Consumer ID must follow the format C-0001.");
         }
-        this.consumerId = consumerId.trim();
+        this.consumerId = consumerId.strip();
     }
 
     public String getConsumerName() {
@@ -39,10 +39,10 @@ public abstract class Consumer implements Billable {
     }
 
     public void setConsumerName(String consumerName) {
-        if (consumerName == null || consumerName.trim().isEmpty()) {
+        if (consumerName == null || consumerName.strip().isEmpty()) {
             throw new IllegalArgumentException("Consumer name cannot be blank.");
         }
-        String name = consumerName.trim();
+        String name = consumerName.strip();
         if (name.length() < 2 || name.length() > 50) {
             throw new IllegalArgumentException("Consumer name must be 2 to 50 characters.");
         }
@@ -66,10 +66,10 @@ public abstract class Consumer implements Billable {
     }
 
     public void setConsumerAddress(String consumerAddress) {
-        if (consumerAddress == null || consumerAddress.trim().isEmpty()) {
+        if (consumerAddress == null || consumerAddress.strip().isEmpty()) {
             throw new IllegalArgumentException("Consumer address cannot be blank.");
         }
-        String address = consumerAddress.trim();
+        String address = consumerAddress.strip();
         if (address.length() < 5 || address.length() > 100) {
             throw new IllegalArgumentException("Consumer address must be 5 to 100 characters.");
         }
