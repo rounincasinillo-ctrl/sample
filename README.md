@@ -70,7 +70,7 @@ Tested on Windows.
 
 ![MySQL Workbench connection](screenshots/01-workbench-connection.png)
 
-### Step 3: Create the database and tables
+## Step 3: Create the database and tables
 
 Open the connection, paste this into a query tab, and run all of it (`Ctrl+Shift+Enter`):
 
@@ -106,11 +106,36 @@ CREATE TABLE meter_readings (
 );
 ```
 
-![SQL script that creates the tables](screenshots/02-create-tables-script.png)
+
 
 Each row of `meter_readings` belongs to either a consumer or a facility. When an account is deleted, its readings are deleted with it.
 
 Refresh **Schemas** on the left. You should see `consumers`, `public_facilities`, and `meter_readings` under `sample_db` > **Tables**.
+
+### Step 3.1: ROLLBACK
+
+This shows that a deleted record can be brought back, as long as the change was not committed. Add one or two consumers first (through the program or with `INSERT`), then run the script below **in the same query tab, one statement at a time** (`Ctrl+Enter`):
+
+```sql
+USE sample_db;
+
+SET AUTOCOMMIT = FALSE;   -- changes are not saved until COMMIT
+
+COMMIT;                   -- save the current data
+DELETE FROM consumers;    -- delete all consumers (not saved yet)
+SELECT * FROM consumers;  -- the table looks empty
+
+ROLLBACK;                 -- cancel the delete, go back to the last COMMIT
+SELECT * FROM consumers;  -- the data is back
+
+SET AUTOCOMMIT = TRUE;    -- return to the normal setting
+```
+
+Notes:
+
+- `AUTOCOMMIT` only applies to the query tab where you set it. Run `SELECT @@autocommit;` (it should show `0`) before the `DELETE`.
+- Do not run `COMMIT` after the `DELETE`, or the deletion becomes permanent.
+- `ROLLBACK` works on `INSERT`, `UPDATE`, and `DELETE`. It cannot undo `CREATE TABLE` or `DROP TABLE`.
 
 ### Step 4: Get the project
 
