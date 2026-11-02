@@ -1,4 +1,5 @@
 import java.time.LocalDate;
+
 public class MeterReading {
 
     private double previousReading;
@@ -54,10 +55,10 @@ public class MeterReading {
     }
 
     public void setReadingDate(String readingDate) {
-        if (readingDate == null || readingDate.trim().isEmpty()) {
+        if (readingDate == null || readingDate.strip().isEmpty()) {
             throw new IllegalArgumentException("Reading date cannot be blank.");
         }
-        String date = readingDate.trim();
+        String date = readingDate.strip();
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
             throw new IllegalArgumentException("Reading date must be in yyyy-MM-dd format.");
         }
