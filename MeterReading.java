@@ -1,6 +1,5 @@
 import java.time.LocalDate;
 public class MeterReading {
-
     private double previousReading;
     private double currentReading;
     private String readingDate;
@@ -54,7 +53,7 @@ public class MeterReading {
     }
 
     public void setReadingDate(String readingDate) {
-        if (readingDate == null || readingDate.strip().isEmpty()) {
+        if (readingDate == null || readingDate.isBlank()) {
             throw new IllegalArgumentException("Reading date cannot be blank.");
         }
         String date = readingDate.strip();
