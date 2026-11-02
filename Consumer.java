@@ -1,11 +1,18 @@
-
-public abstract class Consumer implements Billable{
+public abstract class Consumer implements Billable {
     private String consumerId;
     private String consumerName;
     private String consumerAddress;
     private static int consumerCount = 0;
 
-    public Consumer(String consumerName, String consumerAddress) {
+    public Consumer() {
+        this("Unknown Consumer","Unknown Address");
+    }
+
+    public Consumer(String consumerName){
+        this(consumerName, "Unknown Address");
+    }
+
+    public Consumer(String consumerName, String consumerAddress){
         this(String.format("C-%04d", consumerCount + 1), consumerName, consumerAddress);
     }
 
@@ -19,11 +26,12 @@ public abstract class Consumer implements Billable{
     public String getConsumerId() {
         return consumerId;
     }
+
     public void setConsumerId(String consumerId) {
-        if (consumerId == null || !consumerId.strip().matches("C-\\d{4,}")) {
+        if (consumerId == null || !consumerId.trim().matches("C-\\d{4,}")) {
             throw new IllegalArgumentException("Consumer ID must follow the format C-0001.");
         }
-        this.consumerId = consumerId.strip();
+        this.consumerId = consumerId.trim();
     }
 
     public String getConsumerName() {
@@ -31,10 +39,26 @@ public abstract class Consumer implements Billable{
     }
 
     public void setConsumerName(String consumerName) {
-        if (consumerName == null || consumerName.strip().length() < 2 || consumerName.strip().length() > 50) {
+        if (consumerName == null || consumerName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Consumer name cannot be blank.");
+        }
+        String name = consumerName.trim();
+        if (name.length() < 2 || name.length() > 50) {
             throw new IllegalArgumentException("Consumer name must be 2 to 50 characters.");
         }
-        this.consumerName = consumerName.strip();
+        if (!Character.isLetter(name.charAt(0))) {
+            throw new IllegalArgumentException("Consumer name must start with a letter.");
+        }
+        if (name.contains("  ")) {
+            throw new IllegalArgumentException("Consumer name cannot have repeated spaces.");
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLetter(c) && c != ' ' && c != '.' && c != '-' && c != '\'') {
+                throw new IllegalArgumentException("Consumer name can only contain letters, spaces, periods, hyphens, and apostrophes.");
+            }
+        }
+        this.consumerName = name;
     }
 
     public String getConsumerAddress() {
@@ -42,21 +66,39 @@ public abstract class Consumer implements Billable{
     }
 
     public void setConsumerAddress(String consumerAddress) {
-        if (consumerAddress == null || consumerAddress.strip().length() < 5 || consumerAddress.strip().length() > 100) {
+        if (consumerAddress == null || consumerAddress.trim().isEmpty()) {
+            throw new IllegalArgumentException("Consumer address cannot be blank.");
+        }
+        String address = consumerAddress.trim();
+        if (address.length() < 5 || address.length() > 100) {
             throw new IllegalArgumentException("Consumer address must be 5 to 100 characters.");
         }
-        this.consumerAddress = consumerAddress.strip();
+        boolean hasLetter = false;
+        for (int i = 0; i < address.length(); i++) {
+            char c = address.charAt(i);
+            if (Character.isLetter(c)) {
+                hasLetter = true;
+            } else if (!Character.isDigit(c) && c != ' ' && c != '.' && c != ',' && c != '#' && c != '-' && c != '/' && c != '\'') {
+                throw new IllegalArgumentException("Consumer address contains invalid characters.");
+            }
+        }
+        if (!hasLetter) {
+            throw new IllegalArgumentException("Consumer address must contain at least one letter.");
+        }
+        this.consumerAddress = address;
     }
 
-    public static int getConsumerCount(){
+    public static int getConsumerCount() {
         return consumerCount;
     }
+
     public static void setConsumerCount(int count) {
         if (count < 0) {
             throw new IllegalArgumentException("Consumer count cannot be negative.");
         }
         consumerCount = count;
     }
+
     @Override
     public abstract double calculateBill(MeterReading reading);
     @Override
