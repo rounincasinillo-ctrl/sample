@@ -1,0 +1,222 @@
+import javax.swing.*;
+import java.awt.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.Random;
+
+public final class ReceiptDialog {
+    private static final Font MONO = new Font(Font.MONOSPACED, Font.PLAIN, 13);
+    private static final Font MONO_BOLD = MONO.deriveFont(Font.BOLD);
+
+    private ReceiptDialog() {
+    }
+    
+    public static void show(Component parent, Billable account, MeterReading reading, double bill) {
+        Window owner = SwingUtilities.getWindowAncestor(parent);
+        JDialog dialog = new JDialog(owner, "Bill Computed", Dialog.DEFAULT_MODALITY_TYPE);
+        dialog.setLayout(new BorderLayout());
+
+        JPanel backdrop = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        backdrop.setBackground(UIHelper.LIGHT_GREEN);
+        backdrop.setBorder(BorderFactory.createEmptyBorder(18, 24, 8, 24));
+        backdrop.add(buildPaper(account, reading, bill));
+        JScrollPane scroll = new JScrollPane(backdrop);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        dialog.add(scroll, BorderLayout.CENTER);
+
+        JButton btnClose = new JButton("Close");
+        UIHelper.stylePrimary(btnClose);
+        btnClose.setPreferredSize(new Dimension(140, btnClose.getPreferredSize().height + 6));
+        btnClose.addActionListener(ev -> dialog.dispose());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 8));
+        footer.setBackground(UIHelper.LIGHT_GREEN);
+        footer.add(btnClose);
+        dialog.add(footer, BorderLayout.SOUTH);
+        dialog.getRootPane().setDefaultButton(btnClose);
+
+        dialog.pack();
+        Dimension size = dialog.getSize();
+        int maxH = Toolkit.getDefaultToolkit().getScreenSize().height - 120;   
+        dialog.setSize(size.width + 20, Math.min(size.height, maxH));
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(owner);
+        dialog.setVisible(true);
+    }
+
+    private static JPanel buildPaper(Billable account, MeterReading reading, double bill) {
+        String readingDate = String.valueOf(reading.getReadingDate());
+        String receiptNo = "BILL-" + readingDate.replace("-", "") + "-" + AccountStore.idOf(account);
+        String printed = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd  hh:mm a", Locale.ENGLISH));
+
+        JPanel paper = new JPanel() {
+            {
+                setOpaque(false);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth() - 4, h = getHeight() - 5, tooth = 8, step = 12;
+                Polygon p = new Polygon();
+                p.addPoint(0, tooth);
+                for (int x = 0; x < w; x += step) {
+                    p.addPoint(x + step / 2, 0);
+                    p.addPoint(Math.min(x + step, w), tooth);
+                }
+                p.addPoint(w, h - tooth);
+                for (int x = w; x > 0; x -= step) {
+                    p.addPoint(x - step / 2, h);
+                    p.addPoint(Math.max(x - step, 0), h - tooth);
+                }
+                g2.setColor(new Color(0, 0, 0, 45));   
+                g2.translate(3, 4);
+                g2.fillPolygon(p);
+                g2.translate(-3, -4);
+                g2.setColor(Color.WHITE);            
+                g2.fillPolygon(p);
+                g2.dispose();
+            }
+        };
+        paper.setLayout(new BoxLayout(paper, BoxLayout.Y_AXIS));
+        paper.setBorder(BorderFactory.createEmptyBorder(28, 26, 28, 26));
+        
+        paper.add(receiptCenter("⚡ ELECTRIC COOPERATIVE", MONO.deriveFont(Font.BOLD, 17f)));
+        paper.add(receiptCenter("BILLING SYSTEM", MONO_BOLD));
+        paper.add(receiptGap(6));
+        paper.add(receiptCenter("*** BILLING STATEMENT ***", MONO_BOLD));
+        paper.add(receiptRule(false));
+        paper.add(receiptRow("Receipt No.", receiptNo, MONO));
+        paper.add(receiptRow("Printed", printed, MONO));
+        paper.add(receiptRule(false));
+        
+        paper.add(receiptCenter("ACCOUNT", MONO_BOLD));
+        paper.add(receiptGap(4));
+        paper.add(receiptRow("Name", AccountStore.nameOf(account), MONO_BOLD));
+        paper.add(receiptRow("Account ID", AccountStore.idOf(account), MONO));
+        paper.add(receiptRow("Type", account.getBillableType(), MONO));
+        paper.add(receiptRow(account instanceof Consumer ? "Address" : "Agency", AccountStore.detailOf(account), MONO));
+        paper.add(receiptRule(false));
+        
+        paper.add(receiptCenter("METER READING", MONO_BOLD));
+        paper.add(receiptGap(4));
+        paper.add(receiptRow("Reading date", readingDate, MONO));
+        paper.add(receiptRow("Previous", String.format("%,.2f kWh", reading.getPreviousReading()), MONO));
+        paper.add(receiptRow("Current", String.format("%,.2f kWh", reading.getCurrentReading()), MONO));
+        paper.add(receiptRule(false));
+        
+        paper.add(receiptCenter("COMPUTATION", MONO_BOLD));
+        paper.add(receiptGap(4));
+        paper.add(receiptRow("Consumption", String.format("%,.2f kWh", reading.getConsumption()), MONO));
+        paper.add(receiptRow("Rate per kWh", String.format("PHP %,.2f", account.getRatePerKwh()), MONO));
+        paper.add(receiptRule(true));
+        paper.add(receiptRow("TOTAL AMOUNT DUE", "", MONO_BOLD));
+
+        JPanel total = new JPanel(new BorderLayout());
+        total.setOpaque(false);
+        JLabel lblTotal = new JLabel(String.format("PHP %,.2f", bill), SwingConstants.CENTER);
+        lblTotal.setFont(MONO.deriveFont(Font.BOLD, 26f));
+        lblTotal.setForeground(UIHelper.INK);
+        total.add(lblTotal, BorderLayout.CENTER);
+        total.setAlignmentX(Component.CENTER_ALIGNMENT);
+        total.setMaximumSize(new Dimension(Integer.MAX_VALUE, total.getPreferredSize().height + 6));
+        paper.add(total);
+        paper.add(receiptRule(true));
+        
+        paper.add(receiptGap(4));
+        paper.add(receiptCenter("THANK YOU!", MONO.deriveFont(Font.BOLD, 16f)));
+        paper.add(receiptCenter("Please keep this receipt", MONO));
+        paper.add(receiptCenter("for your records.", MONO));
+        paper.add(receiptGap(12));
+        paper.add(new JComponent() {
+            {
+                setPreferredSize(new Dimension(260, 46));
+                setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+                setAlignmentX(Component.CENTER_ALIGNMENT);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(UIHelper.INK);
+                Random rnd = new Random(receiptNo.hashCode());
+                int totalWidth = 240;
+                int x = (getWidth() - totalWidth) / 2;
+                int end = x + totalWidth;
+                while (x < end) {
+                    int bar = 1 + rnd.nextInt(3);
+                    if (x + bar > end) break;
+                    g2.fillRect(x, 4, bar, getHeight() - 8);
+                    x += bar + 1 + rnd.nextInt(3);
+                }
+                g2.dispose();
+            }
+        });
+        paper.add(receiptCenter(receiptNo, MONO.deriveFont(11f)));
+
+        paper.setPreferredSize(new Dimension(400, paper.getPreferredSize().height));
+        return paper;
+    }
+    
+    private static JPanel receiptRow(String left, String right, Font font) {
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.setOpaque(false);
+        row.add(inkLabel(left, font, SwingConstants.LEFT), BorderLayout.WEST);
+        row.add(inkLabel(right, font, SwingConstants.RIGHT), BorderLayout.CENTER);
+        row.setAlignmentX(Component.CENTER_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height + 4));
+        return row;
+    }
+
+    private static JPanel receiptCenter(String text, Font font) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setOpaque(false);
+        row.add(inkLabel(text, font, SwingConstants.CENTER), BorderLayout.CENTER);
+        row.setAlignmentX(Component.CENTER_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height + 2));
+        return row;
+    }
+
+    private static JLabel inkLabel(String text, Font font, int alignment) {
+        JLabel l = new JLabel(text, alignment);
+        l.setFont(font);
+        l.setForeground(UIHelper.INK);
+        return l;
+    }
+
+    private static Component receiptGap(int height) {
+        JComponent gap = new JPanel();
+        gap.setOpaque(false);
+        gap.setPreferredSize(new Dimension(10, height));
+        gap.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+        gap.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return gap;
+    }
+    
+    private static JComponent receiptRule(boolean solid) {
+        JComponent line = new JComponent() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(0x444444));
+                int y = getHeight() / 2;
+                if (solid) {
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.drawLine(0, y - 2, getWidth(), y - 2);
+                    g2.drawLine(0, y + 2, getWidth(), y + 2);
+                } else {
+                    g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                            10f, new float[]{5f, 4f}, 0f));
+                    g2.drawLine(0, y, getWidth(), y);
+                }
+                g2.dispose();
+            }
+        };
+        line.setPreferredSize(new Dimension(10, 18));
+        line.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
+        line.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return line;
+    }
+}
