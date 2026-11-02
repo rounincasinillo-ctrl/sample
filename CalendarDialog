@@ -1,0 +1,138 @@
+import javax.swing.*;
+import java.awt.*;
+import java.time.LocalDate;
+import java.time.Month;
+import java.time.YearMonth;
+import java.time.format.TextStyle;
+import java.util.Locale;
+
+public final class CalendarDialog {
+    private CalendarDialog() {
+    }
+    
+    public static LocalDate pick(Component parent, LocalDate initial) {
+        Window owner = SwingUtilities.getWindowAncestor(parent);
+        JDialog dialog = new JDialog(owner, "Select Reading Date", Dialog.DEFAULT_MODALITY_TYPE);
+        dialog.setLayout(new BorderLayout(0, 8));
+        ((JComponent) dialog.getContentPane()).setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
+
+        YearMonth[] view = {YearMonth.from(initial)};  
+        LocalDate[] picked = {null};                    
+
+        JLabel lblMonth = new JLabel("", SwingConstants.CENTER);
+        JPanel grid = new JPanel(new GridLayout(6, 7, 4, 4));  
+        
+        int fontHeight = dialog.getFontMetrics(UIManager.getFont("Label.font")).getHeight();
+        int cellW = Math.round(fontHeight * 2.8f);
+        int cellH = Math.round(fontHeight * 2.3f);
+        
+        Runnable redraw = () -> {
+            grid.removeAll();
+            lblMonth.setText(monthName(view[0].getMonth()) + " " + view[0].getYear());
+
+            int offset = view[0].atDay(1).getDayOfWeek().getValue() % 7;   
+            for (int i = 0; i < offset; i++) {
+                grid.add(new JLabel(""));
+            }
+            for (int day = 1; day <= view[0].lengthOfMonth(); day++) {
+                LocalDate date = view[0].atDay(day);
+                JButton b = new JButton(String.valueOf(day));
+                b.setMargin(new Insets(2, 2, 2, 2));  
+                b.setPreferredSize(new Dimension(cellW, cellH));
+                if (date.isAfter(LocalDate.now())) {
+                    UIHelper.style(b, "background: #F2F2F2; disabledBackground: #F2F2F2; "
+                            + "disabledText: #BDBDBD; borderWidth: 0; focusWidth: 0");
+                    b.setEnabled(false);
+                } else if (date.equals(initial)) {
+                    UIHelper.style(b, "background: #2E7D32; foreground: #FFFFFF; font: bold; borderWidth: 0; focusWidth: 0");
+                } else if (date.equals(LocalDate.now())) {
+                    UIHelper.style(b, "background: #FBC02D; foreground: #1B1B1B; font: bold; borderWidth: 0; focusWidth: 0");
+                } else {
+                    UIHelper.style(b, "background: #FFFFFF; foreground: #1B1B1B; borderWidth: 0; focusWidth: 0; "
+                            + "hoverBackground: #FFF8E1");
+                }
+                b.addActionListener(ev -> {
+                    picked[0] = date;
+                    dialog.dispose();
+                });
+                grid.add(b);
+            }
+            while (grid.getComponentCount() < 42) {   
+                grid.add(new JLabel(""));
+            }
+            grid.revalidate();
+            grid.repaint();
+        };
+        
+        lblMonth.setFont(UIHelper.pickFont("Times New Roman", Font.BOLD, 24, new Font(Font.SERIF, Font.BOLD, 24)));
+        lblMonth.setForeground(UIHelper.YELLOW);
+        FontMetrics fm = lblMonth.getFontMetrics(lblMonth.getFont());
+        int longest = 0;  
+        for (Month m : Month.values()) {
+            longest = Math.max(longest, fm.stringWidth(monthName(m) + " 2026"));
+        }
+        lblMonth.setPreferredSize(new Dimension(longest + 40, fm.getHeight() + 10));
+
+        JPanel buttons = new JPanel(new GridLayout(1, 4, 6, 0));
+        buttons.setOpaque(false);
+        buttons.add(navButton("<< Year", -12, view, redraw));
+        buttons.add(navButton("< Month", -1, view, redraw));
+        buttons.add(navButton("Month >", 1, view, redraw));
+        buttons.add(navButton("Year >>", 12, view, redraw));
+
+        JPanel nav = new JPanel(new BorderLayout(0, 8));
+        nav.setBackground(UIHelper.GREEN);
+        nav.setBorder(BorderFactory.createEmptyBorder(10, 8, 8, 8));
+        nav.add(lblMonth, BorderLayout.NORTH);
+        nav.add(buttons, BorderLayout.SOUTH);
+
+        JPanel weekdays = new JPanel(new GridLayout(1, 7, 4, 4));
+        weekdays.setBackground(UIHelper.LIGHT_GREEN);
+        weekdays.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
+        for (String d : new String[]{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}) {
+            JLabel h = new JLabel(d, SwingConstants.CENTER);
+            h.setFont(h.getFont().deriveFont(Font.BOLD, 13f));
+            h.setForeground(UIHelper.DARK_GREEN);
+            weekdays.add(h);
+        }
+
+        JPanel top = new JPanel(new BorderLayout(0, 4));
+        top.add(nav, BorderLayout.NORTH);
+        top.add(weekdays, BorderLayout.SOUTH);
+        dialog.add(top, BorderLayout.NORTH);
+        dialog.add(grid, BorderLayout.CENTER);
+
+        // --- footer: Today button ---
+        JButton btnToday = new JButton("Today");
+        UIHelper.styleAccent(btnToday);
+        btnToday.addActionListener(ev -> {
+            picked[0] = LocalDate.now();
+            dialog.dispose();
+        });
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        footer.add(btnToday);
+        dialog.add(footer, BorderLayout.SOUTH);
+
+        redraw.run();
+        dialog.pack();                
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(owner);
+        dialog.setVisible(true);
+        return picked[0];
+    }
+    
+    private static JButton navButton(String text, int monthsToMove, YearMonth[] view, Runnable redraw) {
+        JButton b = new JButton(text);
+        b.setMargin(new Insets(2, 10, 2, 10));
+        UIHelper.styleAccent(b);
+        b.addActionListener(ev -> {
+            view[0] = view[0].plusMonths(monthsToMove);
+            redraw.run();
+        });
+        return b;
+    }
+
+    private static String monthName(Month m) {
+        return m.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+    }
+}
