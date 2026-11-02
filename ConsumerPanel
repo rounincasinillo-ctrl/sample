@@ -1,0 +1,145 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.sql.SQLException;
+
+/** Tab 1: register, update and delete Residential / Commercial consumers. */
+public class ConsumerPanel extends JPanel {
+    private static final String[] TYPES = {"Residential", "Commercial"};
+    private static final String[] COLUMNS = {"Consumer ID", "Name", "Address", "Type", "Rate per kWh"};
+
+    private final AccountStore store;
+    private final JComboBox<String> cmbType = new JComboBox<>(TYPES);
+    private final JTextField txtName = UIHelper.field("e.g. Juan Dela Cruz");
+    private final JTextField txtAddress = UIHelper.field("e.g. Brgy. San Pablo, San Ildefonso");
+    private final JLabel lblTotalCount = UIHelper.countLabel("Total Consumers: 0");
+    private final DefaultTableModel tableModel = new DefaultTableModel(COLUMNS, 0);
+    private final JTable table = UIHelper.createTable(tableModel);
+
+    public ConsumerPanel(AccountStore store) {
+        super(new BorderLayout(10, 10));
+        this.store = store;
+        setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        add(buildForm(), BorderLayout.NORTH);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JButton btnAdd = new JButton("Add Consumer");
+        JButton btnUpdate = new JButton("Update Selected");
+        JButton btnDelete = new JButton("Delete Selected");
+        UIHelper.stylePrimary(btnAdd);
+        UIHelper.styleAccent(btnUpdate);
+        UIHelper.styleDanger(btnDelete);
+        btnAdd.addActionListener(e -> addConsumer());
+        btnUpdate.addActionListener(e -> updateSelected());
+        btnDelete.addActionListener(e -> UIHelper.deleteSelected(this, store, table));
+        add(UIHelper.buttonRow(btnAdd, btnUpdate, btnDelete), BorderLayout.SOUTH);
+
+        store.addListener(this::refresh);   
+    }
+
+    private JPanel buildForm() {
+        JPanel form = new JPanel(new GridLayout(4, 2, 8, 8));
+        form.setBorder(UIHelper.titledBorder("Register New Consumer"));
+        form.add(new JLabel("Account Type: "));
+        form.add(cmbType);
+        form.add(new JLabel("Full Name: "));
+        form.add(txtName);
+        form.add(new JLabel("Address: "));
+        form.add(txtAddress);
+        form.add(lblTotalCount);
+        form.add(new JLabel(""));
+        return form;
+    }
+    private void addConsumer() {
+        try {
+            String name = txtName.getText();
+            String address = txtAddress.getText();
+
+            Billable newItem;
+            if (cmbType.getSelectedIndex() == 0) {
+                newItem = new Residential(name, address);
+            } else {
+                newItem = new Commercial(name, address);
+            }
+            
+            DatabaseHelper.save(newItem);
+
+            store.add(newItem);
+            txtName.setText("");
+            txtAddress.setText("");
+            UIHelper.info(this, "Success", "Consumer added! \nID: " + AccountStore.idOf(newItem));
+        } catch (IllegalArgumentException ex) {
+            UIHelper.warn(this, "Validation Error", ex.getMessage());
+        } catch (SQLException ex) {
+            UIHelper.error(this, "Database Error", "Could not save: " + ex.getMessage());
+        }
+    }
+
+    private void updateSelected() {
+        Billable selected = store.getSelected(table);
+        if (selected == null) {
+            UIHelper.warn(this, "Warning", "Select a consumer row from the table first.");
+            return;
+        }
+        Consumer old = (Consumer) selected;
+        String oldName = old.getConsumerName();
+        String oldAddress = old.getConsumerAddress();
+
+        JTextField fldName = new JTextField(oldName);
+        JTextField fldAddress = new JTextField(oldAddress);
+        JComboBox<String> fldType = new JComboBox<>(TYPES);
+        fldType.setSelectedIndex(old instanceof Commercial ? 1 : 0);
+
+        boolean confirmed = UIHelper.showForm(
+                this,
+                "Update Consumer",
+                "Account ID: " + old.getConsumerId(),
+                new String[]{"Account Type", "Full Name", "Address"},
+                new JComponent[]{fldType, fldName, fldAddress},
+                "Save Changes"
+        );
+        if (!confirmed) return;
+
+        Billable updated = selected;
+        try {
+            String newName = fldName.getText();
+            String newAddress = fldAddress.getText();
+            boolean toCommercial = fldType.getSelectedIndex() == 1;
+
+            if (toCommercial != (old instanceof Commercial)) {
+                updated = toCommercial
+                        ? new Commercial(old.getConsumerId(), newName, newAddress)
+                        : new Residential(old.getConsumerId(), newName, newAddress);
+            } else {
+                AccountStore.applyEdit(selected, newName, newAddress);
+            }
+
+            DatabaseHelper.updateDetail(updated);
+            store.replace(selected, updated);
+            UIHelper.info(this, "Updated", "Consumer updated!");
+        } catch (IllegalArgumentException ex) {
+            if (updated == selected) AccountStore.applyEdit(selected, oldName, oldAddress);  
+            UIHelper.warn(this, "Validation Error", ex.getMessage());
+        } catch (SQLException ex) { 
+            UIHelper.error(this, "Database Error", "Could not update: " + ex.getMessage());
+        }
+    }
+    private void refresh() {
+        tableModel.setRowCount(0);
+        int count = 0;
+        for (Billable b : store.getAccounts()) {
+            if (b instanceof Consumer) {
+                tableModel.addRow(new Object[]{
+                        AccountStore.idOf(b),
+                        AccountStore.nameOf(b),
+                        AccountStore.detailOf(b),
+                        b.getBillableType(),
+                        "PHP " + b.getRatePerKwh()
+                });
+                count++;
+            }
+        }
+        lblTotalCount.setText("Total Consumers: " + count);
+    }
+}
